@@ -14,7 +14,7 @@ function provider({children}: {children: React.ReactNode}) {
     },[data])
 
     const createNewUser = async() => {
-        const result = await axios.post('api/user', {});
+        const result = await axios.post('/api/user', {});
         console.log(result.data);
     }
 
