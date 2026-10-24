@@ -9,7 +9,7 @@ export const users = pgTable("users", {
 });
 
 export const AgentConfig = pgTable('agentConfig', {
-  id: integer('id').primaryKey(),
+  id: serial('id').primaryKey(),
   agentId: varchar('agentId').notNull().unique(),
   name: varchar('name').notNull(),
   description: text('description'),
