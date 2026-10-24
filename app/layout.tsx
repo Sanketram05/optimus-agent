@@ -2,6 +2,7 @@ import { AuthProvider } from "@/components/session-provider";
 import "./globals.css";
 import {Figtree} from 'next/font/google';
 import type { Metadata } from "next";
+import { Toaster } from "@/components/ui/toast";
 
 const figtree = Figtree({ subsets: ["latin"] });
 
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body style={{ margin: 0, padding: 0 }} className={figtree.className}>
         <AuthProvider>{children}</AuthProvider>
+        <Toaster/>
       </body>
     </html>
   );
