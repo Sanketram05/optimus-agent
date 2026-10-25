@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import axios from "axios"
 import { CheckCircle2, Loader2, PlugZap, Wrench } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -24,18 +24,85 @@ export function ToolSuggestionCard({
   title = "Tools needed",
 }: ToolSuggestionCardProps) {
   const [connectingSlug, setConnectingSlug] = useState<string | null>(null)
+  const [disconnectingSlug, setDisconnectingSlug] = useState<string | null>(null)
+  const [connectedSlugs, setConnectedSlugs] = useState<Set<string>>(
+    () => new Set(tools.filter((tool) => tool.isConnected || tool.isEnabled).map((tool) => tool.slug))
+  )
+  const statusPolls = useRef<Record<string, number>>({})
+
+  useEffect(() => () => {
+    Object.values(statusPolls.current).forEach((poll) => window.clearInterval(poll))
+  }, [])
 
   if (!suggestions.length) return null
 
+  const stopStatusPoll = (toolSlug: string) => {
+    const poll = statusPolls.current[toolSlug]
+    if (poll) window.clearInterval(poll)
+    delete statusPolls.current[toolSlug]
+  }
+
+  const pollConnectionStatus = (toolSlug: string) => {
+    stopStatusPoll(toolSlug)
+    let attempts = 0
+    statusPolls.current[toolSlug] = window.setInterval(async () => {
+      attempts += 1
+      try {
+        const { data } = await axios.get("/api/agent/status", { params: { agentId, toolSlug } })
+        if (data.connected) {
+          setConnectedSlugs((current) => new Set(current).add(toolSlug))
+          stopStatusPoll(toolSlug)
+        } else if (attempts >= 120) {
+          stopStatusPoll(toolSlug)
+        }
+      } catch (error) {
+        console.error("[ToolSuggestionCard] Failed to check tool connection status:", error)
+        stopStatusPoll(toolSlug)
+      }
+    }, 2_000)
+  }
+
   const connectTool = async (toolSlug: string) => {
+    const connectionWindow = window.open("about:blank", "_blank")
     setConnectingSlug(toolSlug)
 
     try {
       const { data } = await axios.post("/api/agent/connect", { agentId, toolSlug })
-      window.location.assign(data.redirectUrl)
+      if (data.connected) {
+        connectionWindow?.close()
+        setConnectedSlugs((current) => new Set(current).add(toolSlug))
+        setConnectingSlug(null)
+        return
+      }
+
+      if (!data.redirectUrl) throw new Error("The connection URL was not returned")
+      if (connectionWindow) {
+        connectionWindow.location.assign(data.redirectUrl)
+      } else {
+        window.open(data.redirectUrl, "_blank")
+      }
+      pollConnectionStatus(toolSlug)
     } catch (error) {
+      connectionWindow?.close()
       console.error("[ToolSuggestionCard] Failed to create a tool connection:", error)
       setConnectingSlug(null)
+    }
+  }
+
+  const disconnectTool = async (toolSlug: string) => {
+    setDisconnectingSlug(toolSlug)
+    try {
+      await axios.post("/api/agent/disconnect", { agentId, toolSlug })
+      stopStatusPoll(toolSlug)
+      setConnectedSlugs((current) => {
+        const next = new Set(current)
+        next.delete(toolSlug)
+        return next
+      })
+    } catch (error) {
+      console.error("[ToolSuggestionCard] Failed to disconnect tool:", error)
+    } finally {
+      setDisconnectingSlug(null)
     }
   }
 
@@ -52,7 +119,7 @@ export function ToolSuggestionCard({
         {suggestions.map((suggestion) => {
           const tool = tools.find((item) => item.slug === suggestion.slug)
           const name = tool?.name ?? suggestion.slug
-          const connected = tool?.isConnected || tool?.isEnabled
+          const connected = connectedSlugs.has(suggestion.slug)
           const toolIcon = tool?.icon
 
           return (
@@ -72,7 +139,18 @@ export function ToolSuggestionCard({
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">{name}</p>
                   {connected ? (
-                    <Badge variant="secondary"><CheckCircle2 /> Connected</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary"><CheckCircle2 /> Connected</Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => disconnectTool(suggestion.slug)}
+                        disabled={disconnectingSlug === suggestion.slug}
+                      >
+                        {disconnectingSlug === suggestion.slug ? <Loader2 className="animate-spin" /> : null}
+                        {disconnectingSlug === suggestion.slug ? "Disconnecting" : "Disconnect"}
+                      </Button>
+                    </div>
                   ) : (
                     <Button
                       size="sm"

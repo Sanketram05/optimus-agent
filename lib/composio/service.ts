@@ -4,27 +4,44 @@ import { AgentConfig, db } from "@/db";
 import { eq } from "drizzle-orm";
 
 export async function getOrCreateAgentSession(agentConfig:AgentConfigType, userEmail: string){
+    const toolSlugs = Array.isArray(agentConfig.tools)
+        ? agentConfig.tools.filter((tool): tool is string => typeof tool === "string")
+        : [];
+    const connectedAccounts = await getActiveConnectedAccounts(userEmail, toolSlugs);
+
     if(agentConfig?.composioSessionId){
         try {
-            const session = await composio.sessions.use(agentConfig?.composioSessionId)
-            if(session) return session;
+            const session = await composio.sessions.use(agentConfig.composioSessionId);
+
+            // Keep the same saved session, but refresh its tools and this user's active accounts.
+            try {
+                await session.update({
+                    toolkits: toolSlugs,
+                    connectedAccounts,
+                });
+            } catch (error) {
+                console.error("Failed to refresh existing Composio session:", error);
+            }
+
+            return session;
         } catch (e) {
-            console.log('Recreate new session')
+            console.warn("Saved Composio session is unavailable; creating a replacement session.");
         }
     }
 
-    const toolSlug = agentConfig?.tools || [];
-
-    const connectedAccounts = await getActiveConnectedAccounts(userEmail,toolSlug);
-
     const session = await composio.sessions.create(userEmail,{
-        toolkits: toolSlug.length>0 ? toolSlug:undefined,
+        toolkits: toolSlugs.length > 0 ? toolSlugs : undefined,
         connectedAccounts: Object.keys(connectedAccounts).length > 0 ? connectedAccounts : undefined,
-    })
+    });
 
-    const result = await db.update(AgentConfig).set({
-        composioSessionId: (session as any).sessionId || session.sessionId
+    await db.update(AgentConfig).set({
+        composioSessionId: session.sessionId,
     }).where(eq(AgentConfig.agentId, agentConfig.agentId));
+
+    console.log("Saved Composio session for agent:", {
+        agentId: agentConfig.agentId,
+        sessionId: session.sessionId,
+    });
 
     return session;
 }  
