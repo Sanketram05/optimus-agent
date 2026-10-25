@@ -2,7 +2,7 @@
 
 import { useContext, useState } from "react"
 import { Bot, Loader, Send } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,6 +11,7 @@ import { useParams } from "next/navigation"
 import axios from "axios"
 import { toast } from "@/components/ui/toast"
 import { AgentConfigContext } from "@/context/AgentConfigContext"
+import { AgentResponseView } from "./generative-ui/AgentResponseView"
 
 const agentImage = "/OptimusLogo.png"
 
@@ -48,15 +49,28 @@ export function AgentChat() {
     try{
       const result = await axios.post('/api/agent/chat',{
         agentId: agentId,
-        messages: updatedMsgs
+        messages: updatedMsgs,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       })
       
-      console.log(result.data.response);
+      const agentResponse = result.data.response;
+      console.log("[AgentChat] Structured agent response:", {
+        type: agentResponse?.type,
+        response: agentResponse,
+        suggestedTools: agentResponse?.suggestedTools ?? [],
+        routine: agentResponse?.routine ?? null,
+      });
+
+      if (agentResponse?.suggestedTools?.length) {
+        console.log("[AgentChat] Agent suggested tools:", agentResponse.suggestedTools);
+      }
 
       const agentMsg: MessageType = {
         id: crypto.randomUUID(),
         role: 'agent',
-        content: result.data.response,
+        content: agentResponse?.message,
+        response: agentResponse,
+        toolsCards: result.data?.ToolsConnection,
         time: new Date().toLocaleDateString()
       }
 
@@ -110,7 +124,7 @@ export function AgentChat() {
                       <span className="text-muted-foreground">{""}</span>
                     </div>
                     <div className="rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-sm leading-6 shadow-sm">
-                      {msg.content}
+                      <AgentResponseView message={msg} agentId={String(agentId)} />
                     </div>
                   </div>
                 </div>
@@ -124,9 +138,9 @@ export function AgentChat() {
                       {msg.content}
                     </div>
                   </div>
-                  <Avatar className="mt-0.5 size-8" size="sm">
+                  <Avatar className="mt-0.5 size-12" size="sm">
                     <AvatarFallback className="bg-secondary font-medium text-secondary-foreground">
-                      SR
+                      U
                     </AvatarFallback>
                   </Avatar>
                 </div>
@@ -172,3 +186,4 @@ export function AgentChat() {
     </section>
   )
 }
+
