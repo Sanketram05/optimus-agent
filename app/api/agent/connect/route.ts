@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { AgentConfig, db, Tools } from "@/db";
 import { composio } from "@/lib/composio/composio";
+import { getActiveConnectedAccounts } from "@/lib/composio/service";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -29,18 +30,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Agent or tool not found" }, { status: 404 });
   }
 
+  const activeAccounts = await getActiveConnectedAccounts(session.user.email, [toolSlug]);
+  if (activeAccounts[toolSlug.toLowerCase()]?.length) {
+    return NextResponse.json({ connected: true });
+  }
+
   const authConfigs = await composio.authConfigs.list({ toolkit: toolSlug });
   const authConfig = authConfigs.items[0] ?? await composio.authConfigs.create(toolSlug, {
     type: "use_composio_managed_auth",
   });
 
   const configuredTools = Array.isArray(agentConfig.tools) ? agentConfig.tools : [];
-  if (!configuredTools.includes(toolSlug)) {
-    await db
-      .update(AgentConfig)
-      .set({ tools: [...configuredTools, toolSlug], composioSessionId: null })
-      .where(eq(AgentConfig.agentId, agentConfig.agentId));
-  }
+  await db
+    .update(AgentConfig)
+    .set({
+      tools: configuredTools.includes(toolSlug) ? configuredTools : [...configuredTools, toolSlug],
+    })
+    .where(eq(AgentConfig.agentId, agentConfig.agentId));
 
   const callbackUrl = new URL(`/workspace/${agentId}`, req.url).toString();
   const connection = await composio.connectedAccounts.link(
