@@ -261,6 +261,26 @@ export function SchedulePanel() {
   )
 }
 
+export function ExecutionHistoryPanel() {
+  const { agentConfig } = useContext(AgentConfigContext)
+  const [executions, setExecutions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    if (!agentConfig?.agentId) return
+    axios.get(`/api/routines/execution?agentId=${encodeURIComponent(agentConfig.agentId)}`)
+      .then(({ data }) => setExecutions(data.executions))
+      .catch(() => toast.add({ type: "error", title: "Unable to load execution history" }))
+      .finally(() => setLoading(false))
+  }, [agentConfig?.agentId])
+  return <div className="space-y-5"><div><h3 className="text-sm font-semibold">Routine Execution History</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Recent routine outcomes and execution logs.</p></div>
+    {loading ? <p className="text-sm text-muted-foreground">Loading history…</p> : executions.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No routine executions yet.</div> : <div className="space-y-3">{executions.map(({ execution, routineName }) => {
+      const completed = execution.completedAt ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(execution.completedAt)) : "In progress"
+      const output = execution.result?.output ?? execution.error ?? "No output recorded."
+      return <div key={execution.id} className="rounded-xl border border-border p-3"><div className="flex items-center justify-between gap-3"><p className="min-w-0 truncate text-sm font-medium">{routineName}</p><span className={`shrink-0 text-xs font-medium ${execution.status === "completed" ? "text-green-600" : execution.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}>{execution.status}</span></div><p className="mt-1 text-xs text-muted-foreground">{completed}</p><p className="mt-2 break-words text-sm leading-5">{typeof output === "string" ? output : JSON.stringify(output)}</p></div>
+    })}</div>}
+  </div>
+}
+
 export function AgentSettingsPanel() {
   const options = [
     {

@@ -3,6 +3,7 @@
 import { useContext, useState } from "react"
 import {
   CalendarClock,
+  ClipboardList,
   Check,
   Puzzle,
   RefreshCw,
@@ -17,16 +18,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { AgentSettingsPanel, SchedulePanel, SettingsPanel, ToolsPanel } from "./ConfigurationPanels"
+import { AgentSettingsPanel, ExecutionHistoryPanel, SchedulePanel, SettingsPanel, ToolsPanel } from "./ConfigurationPanels"
 import { AgentConfigContext } from "@/context/AgentConfigContext"
 import axios from "axios"
 import { toast } from "@/components/ui/toast"
 
-type ConfigTab = "settings" | "tools" | "schedule" | "agent-settings"
+type ConfigTab = "settings" | "tools" | "schedule" | "history" | "agent-settings"
 const configTabs: { id: ConfigTab; label: string; icon: typeof Settings2 }[] = [
   { id: "settings", label: "Settings", icon: Settings2 },
   { id: "tools", label: "Tools", icon: Puzzle },
   { id: "schedule", label: "Schedule", icon: CalendarClock },
+  { id: "history", label: "Routine Execution History", icon: ClipboardList },
   { id: "agent-settings", label: "Agent settings", icon: SlidersHorizontal },
 ]
 
@@ -64,8 +66,8 @@ export function AgentConfigurationSidebar() {
   }
 
   return (
-    <aside className="hidden h-dvh w-[420px] shrink-0 flex-col border-l border-border bg-card xl:flex">
-      <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-border px-5">
+    <aside className="hidden h-dvh w-105 shrink-0 flex-col border-l border-border bg-card xl:flex">
+      <div className="flex h-18 shrink-0 items-center justify-between border-b border-border px-5">
         <h2 className="text-sm font-semibold">Agent Configuration</h2>
         <Button size="sm" onClick={UpdateAgentConfig}>
           <Check className="size-3.5" />
@@ -82,6 +84,7 @@ export function AgentConfigurationSidebar() {
           {activeTab === "settings" && <SettingsPanel />}
           {activeTab === "tools" && <ToolsPanel />}
           {activeTab === "schedule" && <SchedulePanel />}
+          {activeTab === "history" && <ExecutionHistoryPanel />}
           {activeTab === "agent-settings" && <AgentSettingsPanel />}
         </div>
       </div>

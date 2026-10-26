@@ -70,6 +70,13 @@ export const RoutineExecutions = pgTable("routine_executions", {
 }, (table) => [
   uniqueIndex("routine_executions_routine_scheduled_unique").on(table.routineId, table.scheduledFor),
 ]);
+
+export const AgentChatHistory = pgTable("agent_chat_history", {
+  agentId: varchar("agent_id").primaryKey().references(() => AgentConfig.agentId),
+  userEmail: text("user_email").notNull().references(() => users.email),
+  messages: jsonb("messages").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
  
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

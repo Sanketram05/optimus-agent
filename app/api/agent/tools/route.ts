@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     tools: tools.map((tool) => ({
       ...tool,
-      connected: Boolean(accounts[tool.slug.toLowerCase()]?.length),
+      // Connected accounts belong to the user, but a tool is only available
+      // in this panel when this particular agent has enabled it as well.
+      connected: Boolean(configured.includes(tool.slug) && accounts[tool.slug.toLowerCase()]?.length),
       enabled: configured.includes(tool.slug),
     })),
   });
