@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { getServerSession } from "next-auth";
-import { AgentConfig, db, Routines, Tools } from "@/db";
+import { AgentChatHistory, AgentConfig, db, Routines, Tools } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { executeAgentChat } from "@/lib/openai/openai-agent";
 import { getActiveConnectedAccounts, getOrCreateAgentSession } from "@/lib/composio/service";
@@ -126,9 +126,28 @@ export async function POST(req: NextRequest) {
             .filter((tool) => suggestedSlugs.includes(tool.slug))
             .map((tool) => ({
                 ...tool,
-                isConnected: Boolean(activeAccounts[tool.slug.toLowerCase()]?.length),
+                // A user's account may be connected globally, but it is only
+                // connected for this agent once the agent enables that toolkit.
+                isConnected: connectedToolSlugs.includes(tool.slug),
             }));
     }
 
-    return NextResponse.json({response, ToolsConnection});
+    const agentMessageId = crypto.randomUUID();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const now = new Date().toISOString();
+    const history = [...messages, { id: agentMessageId, role: "agent", content: response?.message ?? "", response: response ?? null, toolsCards: ToolsConnection, time: now, savedAt: now }]
+        .map((message) => ({ ...message, savedAt: message.savedAt ?? now }))
+        .filter((message) => new Date(message.savedAt).getTime() >= threeDaysAgo.getTime());
+    await db.insert(AgentChatHistory).values({ agentId, userEmail: session.user.email, messages: history, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: AgentChatHistory.agentId, set: { userEmail: session.user.email, messages: history, updatedAt: new Date() } });
+    return NextResponse.json({response, ToolsConnection, agentMessageId});
+}
+
+export async function GET(req: NextRequest) {
+    const session = await getServerSession(authOptions);
+    const agentId = req.nextUrl.searchParams.get("agentId");
+    if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!agentId) return NextResponse.json({ error: "agentId is required" }, { status: 400 });
+    const [history] = await db.select().from(AgentChatHistory).where(and(eq(AgentChatHistory.agentId, agentId), eq(AgentChatHistory.userEmail, session.user.email)));
+    return NextResponse.json({ messages: Array.isArray(history?.messages) ? history.messages : [] });
 }

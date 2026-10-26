@@ -60,12 +60,12 @@ function AppSidebar() {
         </div>
 
         <nav aria-label="Your agents" className="space-y-1 overflow-y-auto">
-          {agents?.map((agent, index) => (
-            <button
-              key={agent.name}
-              type="button"
+          {agents?.map((agent) => (
+            <Link
+              key={agent.agentId}
+              href={`/workspace/${agent.agentId}`}
               className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm font-medium transition-colors ${
-                index === 0
+                path === `/workspace/${agent.agentId}`
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
@@ -75,7 +75,7 @@ function AppSidebar() {
                 <AvatarFallback>{agent?.agentImage}</AvatarFallback>
               </Avatar>
               <span className="truncate">{agent.name}</span>
-            </button>
+            </Link>
           ))}
         </nav>
       </div>

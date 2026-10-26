@@ -1,5 +1,5 @@
-import { and, eq, lte } from "drizzle-orm";
-import { AgentConfig, db, RoutineExecutions, Routines, Tools } from "@/db";
+import { and, eq, lt, lte } from "drizzle-orm";
+import { AgentChatHistory, AgentConfig, db, RoutineExecutions, Routines, Tools } from "@/db";
 import { executeRoutineAgent } from "@/lib/openai/openai-agent";
 import { RoutineSchedule, calculateNextRunAt } from "@/lib/routines/next-run";
 import { getActiveConnectedAccounts, getOrCreateAgentSession } from "@/lib/composio/service";
@@ -8,11 +8,25 @@ import { inngest } from "./client";
 
 type RoutineExecutionData = { executionId: string; routineId: string; scheduledFor: string };
 
+async function appendRoutineResultToChat(agentId: string, userEmail: string, executionId: string, routineName: string, output: unknown) {
+  const [history] = await db.select().from(AgentChatHistory)
+    .where(and(eq(AgentChatHistory.agentId, agentId), eq(AgentChatHistory.userEmail, userEmail)));
+  const existing = Array.isArray(history?.messages) ? history.messages as Array<Record<string, unknown>> : [];
+  const messageId = `routine-execution-${executionId}`;
+  const entry = { id: messageId, role: "agent", content: `Routine “${routineName}” completed.\n\n${typeof output === "string" ? output : JSON.stringify(output)}`, time: new Date().toISOString(), savedAt: new Date().toISOString() };
+  const messages = [...existing.filter((message) => message.id !== messageId), entry].filter((message) => new Date(String(message.savedAt ?? message.time)).getTime() >= Date.now() - 3 * 24 * 60 * 60 * 1000);
+  await db.insert(AgentChatHistory).values({ agentId, userEmail, messages, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: AgentChatHistory.agentId, set: { userEmail, messages, updatedAt: new Date() } });
+}
+
 /** Hourly poller: atomically claims each eligible routine before durable enqueueing. */
 export const routineScheduler = inngest.createFunction(
   { id: "routine-scheduler", name: "Routine scheduler" },
   { cron: "0 * * * *" },
   async ({ step }) => {
+    await step.run("purge-expired-chat-history", async () => {
+      await db.delete(AgentChatHistory).where(lt(AgentChatHistory.updatedAt, new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)));
+    });
     const windowEnd = new Date(Date.now() + 60 * 60 * 1000);
     const claims = await step.run("claim-routines-in-next-hour", async () => {
       const candidates = await db.select().from(Routines)
@@ -72,7 +86,7 @@ export const executeRoutine = inngest.createFunction(
         const composioTools = session ? await session.tools() : [];
         const catalog = connectedSlugs.length ? await db.select().from(Tools).where(eq(Tools.isActive, true)) : [];
         const output = await executeRoutineAgent(agent.name, agent.description ?? "", routine.name, routine.goal, routine.instructions, composioTools, (routine.schedule as RoutineSchedule).timezone);
-        return { output, connectedTools: catalog.filter((tool) => connectedSlugs.includes(tool.slug)).map((tool) => tool.slug) };
+        return { output, agentId: agent.agentId, userEmail: agent.userEmail, routineName: routine.name, connectedTools: catalog.filter((tool) => connectedSlugs.includes(tool.slug)).map((tool) => tool.slug) };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown execution error";
         await db.update(RoutineExecutions).set({ status: "failed", error: message, completedAt: new Date() })
@@ -83,6 +97,9 @@ export const executeRoutine = inngest.createFunction(
     await step.run("mark-execution-completed", async () => {
       await db.update(RoutineExecutions).set({ status: "completed", result, error: null, completedAt: new Date() })
         .where(eq(RoutineExecutions.id, executionId));
+      // Always retain a user-visible result in the agent chat. External tool
+      // delivery is additive, not a replacement for the execution summary.
+      await appendRoutineResultToChat(result.agentId, result.userEmail, executionId, result.routineName, result.output);
     });
     return { executionId, status: "completed" };
   },

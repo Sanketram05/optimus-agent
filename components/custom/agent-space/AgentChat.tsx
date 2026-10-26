@@ -2,12 +2,13 @@
 
 import { useContext, useEffect, useRef, useState } from "react"
 import { Bot, Loader, Send } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageType } from "@/type/Message"
 import { useParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import axios from "axios"
 import { toast } from "@/components/ui/toast"
 import { AgentConfigContext } from "@/context/AgentConfigContext"
@@ -21,6 +22,7 @@ export function AgentChat() {
   const [loading,setLoading] = useState(false);
   const {agentConfig,setAgentConfig} = useContext(AgentConfigContext)
   const {agentId} = useParams();
+  const { data: session } = useSession()
   const [messages, setMessages] = useState<MessageType[]>([
     {
       id: "welcome",
@@ -32,6 +34,23 @@ export function AgentChat() {
   // State updates are asynchronous; this ref guarantees the edit target survives
   // until the AI returns the replacement routine card.
   const editingRoutineIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!agentId) return
+    const loadHistory = async () => {
+      try {
+        const { data } = await axios.get(`/api/agent/chat?agentId=${encodeURIComponent(String(agentId))}`)
+        if (data.messages?.length) {
+          setMessages(data.messages.map((message: any) => ({
+            id: message.id, role: message.role, content: message.content,
+            response: message.response ?? undefined, toolsCards: message.toolsCards ?? undefined,
+            time: new Date(message.createdAt).toLocaleString(),
+          })))
+        }
+      } catch { /* A new chat can still start without saved history. */ }
+    }
+    void loadHistory()
+  }, [agentId])
 
   useEffect(() => {
     const beginEdit = (event: Event) => {
@@ -91,7 +110,7 @@ export function AgentChat() {
       }
 
       const agentMsg: MessageType = {
-        id: crypto.randomUUID(),
+        id: result.data.agentMessageId ?? crypto.randomUUID(),
         role: 'agent',
         content: agentResponse?.message,
         response: agentResponse,
@@ -168,6 +187,10 @@ export function AgentChat() {
                     </div>
                   </div>
                   <Avatar className="mt-0.5 size-12" size="sm">
+                    <AvatarImage
+                      src={session?.user?.image ?? undefined}
+                      alt={session?.user?.name ?? "User"}
+                    />
                     <AvatarFallback className="bg-secondary font-medium text-secondary-foreground">
                       U
                     </AvatarFallback>
@@ -215,4 +238,3 @@ export function AgentChat() {
     </section>
   )
 }
-
