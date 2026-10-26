@@ -1,10 +1,11 @@
 "use client"
 
-import { useContext, useState } from "react"
+import { useCallback, useContext, useState } from "react"
 import {
   CalendarClock,
   ClipboardList,
   Check,
+  Monitor,
   Puzzle,
   RefreshCw,
   Settings2,
@@ -19,12 +20,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { AgentSettingsPanel, ExecutionHistoryPanel, SchedulePanel, SettingsPanel, ToolsPanel } from "./ConfigurationPanels"
+import { VmDesktop } from "./VmDesktop"
 import { AgentConfigContext } from "@/context/AgentConfigContext"
 import axios from "axios"
 import { toast } from "@/components/ui/toast"
 
-type ConfigTab = "settings" | "tools" | "schedule" | "history" | "agent-settings"
+type ConfigTab = "preview" | "settings" | "tools" | "schedule" | "history" | "agent-settings"
 const configTabs: { id: ConfigTab; label: string; icon: typeof Settings2 }[] = [
+  { id: "preview", label: "Preview", icon: Monitor },
   { id: "settings", label: "Settings", icon: Settings2 },
   { id: "tools", label: "Tools", icon: Puzzle },
   { id: "schedule", label: "Schedule", icon: CalendarClock },
@@ -36,6 +39,9 @@ export function AgentConfigurationSidebar() {
   const [activeTab, setActiveTab] = useState<ConfigTab>("settings")
 
   const {agentConfig, setAgentConfig} = useContext(AgentConfigContext);
+  const handleVmStatusChange = useCallback((status: "not-created" | "paused" | "running") => {
+    if (status === "running") setActiveTab("preview")
+  }, [])
 
   const UpdateAgentConfig = async() => {
     if (!agentConfig) return;
@@ -81,6 +87,9 @@ export function AgentConfigurationSidebar() {
           onTabChange={setActiveTab}
         />
         <div className="px-5 py-5">
+          <div className={activeTab === "preview" ? "" : "hidden"}>
+            <VmDesktop active={activeTab === "preview"} onStatusChange={handleVmStatusChange} />
+          </div>
           {activeTab === "settings" && <SettingsPanel />}
           {activeTab === "tools" && <ToolsPanel />}
           {activeTab === "schedule" && <SchedulePanel />}

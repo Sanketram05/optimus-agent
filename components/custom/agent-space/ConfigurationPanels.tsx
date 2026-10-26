@@ -45,8 +45,8 @@ export function SettingsPanel() {
       <div>
         <FieldLabel>Agent description &amp; instructions</FieldLabel>
         <Textarea
-          defaultValue={agentConfig?.description}
-          className="min-h-52 resize-y leading-6"
+          value={agentConfig?.description ?? ""}
+          className="min-h-32 resize-y leading-6"
           onChange={(e) => setAgentConfig({ ...agentConfig, description: e.target.value })}
         />
       </div>
@@ -198,9 +198,14 @@ export function SchedulePanel() {
         try {
           const { data: latest } = await axios.get(`/api/routines/execution?id=${encodeURIComponent(execution.id)}`)
           setExecutions((current) => ({ ...current, [routineToRun.id]: { id: execution.id, status: latest.execution.status } }))
-          if (["completed", "failed"].includes(latest.execution.status)) {
+          if (["completed", "failed", "needs_user_login"].includes(latest.execution.status)) {
             window.clearInterval(poll)
-            toast.add({ type: latest.execution.status === "completed" ? "success" : "error", title: latest.execution.status === "completed" ? "Routine completed" : "Routine failed", description: latest.execution.error ?? undefined })
+            const needsLogin = latest.execution.status === "needs_user_login"
+            toast.add({
+              type: needsLogin ? "info" : latest.execution.status === "completed" ? "success" : "error",
+              title: needsLogin ? "Routine needs your login" : latest.execution.status === "completed" ? "Routine completed" : "Routine failed",
+              description: needsLogin ? "Open this agent's Preview tab, click Open/Resume VM Desktop, sign in, then ask the agent to continue." : latest.execution.error ?? undefined,
+            })
           }
         } catch { window.clearInterval(poll) }
       }, 2_500)
@@ -276,7 +281,8 @@ export function ExecutionHistoryPanel() {
     {loading ? <p className="text-sm text-muted-foreground">Loading history…</p> : executions.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No routine executions yet.</div> : <div className="space-y-3">{executions.map(({ execution, routineName }) => {
       const completed = execution.completedAt ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(execution.completedAt)) : "In progress"
       const output = execution.result?.output ?? execution.error ?? "No output recorded."
-      return <div key={execution.id} className="rounded-xl border border-border p-3"><div className="flex items-center justify-between gap-3"><p className="min-w-0 truncate text-sm font-medium">{routineName}</p><span className={`shrink-0 text-xs font-medium ${execution.status === "completed" ? "text-green-600" : execution.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}>{execution.status}</span></div><p className="mt-1 text-xs text-muted-foreground">{completed}</p><p className="mt-2 break-words text-sm leading-5">{typeof output === "string" ? output : JSON.stringify(output)}</p></div>
+      const vmTask = execution.result?.vmTask
+      return <div key={execution.id} className="rounded-xl border border-border p-3"><div className="flex items-center justify-between gap-3"><p className="min-w-0 truncate text-sm font-medium">{routineName}</p><span className={`shrink-0 text-xs font-medium ${execution.status === "completed" ? "text-green-600" : execution.status === "failed" ? "text-destructive" : execution.status === "needs_user_login" ? "text-amber-600" : "text-muted-foreground"}`}>{execution.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-xs text-muted-foreground">{completed}</p><p className="mt-2 break-words text-sm leading-5">{typeof output === "string" ? output : JSON.stringify(output)}</p>{vmTask && <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm"><p className="font-medium">VM desktop · {vmTask.status.replaceAll("_", " ")}</p><p className="mt-1">{vmTask.summary}</p>{vmTask.details?.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-4">{vmTask.details.map((detail: string, index: number) => <li key={`${index}-${detail}`}>{detail}</li>)}</ul>}{vmTask.userAction && <p className="mt-2 font-medium">{vmTask.userAction}</p>}</div>}</div>
     })}</div>}
   </div>
 }
