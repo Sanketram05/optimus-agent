@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext, useState } from "react"
+import { useContext, useEffect, useRef, useState } from "react"
 import { Bot, Loader, Send } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,30 @@ export function AgentChat() {
       time: new Date().toString(),
     }
   ])
+  // State updates are asynchronous; this ref guarantees the edit target survives
+  // until the AI returns the replacement routine card.
+  const editingRoutineIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const beginEdit = (event: Event) => {
+      const routine = (event as CustomEvent).detail
+      editingRoutineIdRef.current = routine.id
+      setMessages((current) => [...current, {
+        id: crypto.randomUUID(), role: "agent",
+        content: `EDITING ROUTINE (id: ${routine.id})\nName: ${routine.name}\nGoal: ${routine.goal}\nInstructions: ${routine.instructions}\nSchedule: ${JSON.stringify(routine.schedule)}\n\nWhat would you like to change?`,
+        editingRoutine: {
+          id: routine.id,
+          name: routine.name,
+          goal: routine.goal,
+          instructions: routine.instructions,
+          schedule: routine.schedule,
+        },
+        time: new Date().toLocaleDateString(),
+      }])
+    }
+    window.addEventListener("routine:edit", beginEdit)
+    return () => window.removeEventListener("routine:edit", beginEdit)
+  }, [])
 
   const handleSendMessage = async() => {
     if(!userInput.trim() || !agentId){
@@ -57,6 +81,7 @@ export function AgentChat() {
       console.log("[AgentChat] Structured agent response:", {
         type: agentResponse?.type,
         response: agentResponse,
+        routineId: agentResponse?.type === "routine" ? editingRoutineIdRef.current ?? undefined : undefined,
         suggestedTools: agentResponse?.suggestedTools ?? [],
         routine: agentResponse?.routine ?? null,
       });
@@ -70,11 +95,15 @@ export function AgentChat() {
         role: 'agent',
         content: agentResponse?.message,
         response: agentResponse,
+        routineId: agentResponse?.type === "routine" ? editingRoutineIdRef.current ?? undefined : undefined,
         toolsCards: result.data?.ToolsConnection,
         time: new Date().toLocaleDateString()
       }
 
       setMessages((prev) => [...prev,agentMsg]);
+      if (agentResponse?.type === "routine" && editingRoutineIdRef.current) {
+        editingRoutineIdRef.current = null
+      }
 
     } catch(e){
       toast.add({

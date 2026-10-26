@@ -31,9 +31,23 @@ export async function POST(req: NextRequest) {
 
     const agentConfig = agentConfigs[0];
 
-    if(agentConfig?.tools){
-        //@ts-ignore
-        const composioSession = await getOrCreateAgentSession(agentConfig, session.user?.email);
+    if (!agentConfig) {
+        return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    }
+
+    const configuredToolSlugs = Array.isArray(agentConfig.tools)
+        ? agentConfig.tools.filter((tool): tool is string => typeof tool === "string")
+        : [];
+    const activeConnectedAccounts = await getActiveConnectedAccounts(
+        session.user.email,
+        configuredToolSlugs
+    );
+    const connectedToolSlugs = configuredToolSlugs.filter(
+        (slug) => activeConnectedAccounts[slug.toLowerCase()]?.length
+    );
+
+    if (connectedToolSlugs.length) {
+        const composioSession = await getOrCreateAgentSession(agentConfig as AgentConfigType, session.user.email);
         agentComposioTools = await composioSession.tools();
     }
     
@@ -45,20 +59,48 @@ export async function POST(req: NextRequest) {
         description: tool.description
     }))
 
-    const response = await executeAgentChat(agentConfig.name, agentConfig?.description??"", messages, agentComposioTools, toolsCatalog, timezone);
+    const response = await executeAgentChat(
+        agentConfig.name,
+        agentConfig.description ?? "",
+        messages,
+        agentComposioTools,
+        toolsCatalog,
+        timezone,
+        connectedToolSlugs
+    );
+
+    // The model can vary a toolkit slug's casing despite being given the catalog.
+    // Use the database/catalog spelling for all downstream connection requests.
+    if (response) {
+        const canonicalSlug = new Map(toolsCatalog.map((tool) => [tool.slug.toLowerCase(), tool.slug]));
+        const normalizeSuggestions = (suggestions: typeof response.suggestedTools) => suggestions.map((suggestion) => ({
+            ...suggestion,
+            slug: canonicalSlug.get(suggestion.slug.toLowerCase()) ?? suggestion.slug,
+        }));
+        response.suggestedTools = normalizeSuggestions(response.suggestedTools);
+        response.connectedTools = normalizeSuggestions(response.connectedTools);
+        if (response.routine) {
+            response.routine.tools = normalizeSuggestions(response.routine.tools);
+        }
+    }
 
     console.log("[Agent Chat API] Structured agent response:", {
         type: response?.type,
         response,
         suggestedTools: response?.suggestedTools ?? [],
+        connectedTools: response?.connectedTools ?? [],
         routine: response?.routine ?? null,
+        connectedToolSlugs,
     });
 
     let ToolsConnection: Array<(typeof tools)[number] & { isConnected: boolean }> = [];
     
-    if(response?.routine || response?.suggestedTools?.length){
-        const suggestedSlugs = response.routine?.tools.map((tool) => tool.slug)
-            ?? response.suggestedTools.map((tool) => tool.slug);
+    if(response?.routine || response?.suggestedTools?.length || response?.connectedTools?.length){
+        const suggestedSlugs = [
+            ...(response.routine?.tools.map((tool) => tool.slug) ?? []),
+            ...response.suggestedTools.map((tool) => tool.slug),
+            ...response.connectedTools.map((tool) => tool.slug),
+        ];
         const activeAccounts = await getActiveConnectedAccounts(
             session.user.email,
             suggestedSlugs

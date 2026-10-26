@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ToolConnectionCardData } from "@/type/Message"
+import { toast } from "@/components/ui/toast"
 
 type SuggestedTool = { slug: string; reason: string }
 
@@ -85,6 +86,12 @@ export function ToolSuggestionCard({
     } catch (error) {
       connectionWindow?.close()
       console.error("[ToolSuggestionCard] Failed to create a tool connection:", error)
+      const message = axios.isAxiosError(error) ? error.response?.data?.error : undefined
+      toast.add({
+        type: "error",
+        title: "Unable to connect this tool",
+        description: message ?? "This integration is unavailable. Please try again.",
+      })
       setConnectingSlug(null)
     }
   }

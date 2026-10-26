@@ -6,6 +6,20 @@ export type MessageType = {
     content: string,
     time: string,
     response?:AgentResponse,
+    routineId?: string,
+    editingRoutine?: {
+        id: string,
+        name: string,
+        goal: string,
+        instructions: string,
+        schedule: {
+            startDate: string,
+            time: string,
+            timezone: string,
+            frequency: string,
+            weekDays: string[],
+        }
+    },
     toolsCards?: ToolConnectionCardData[]
 }
 

@@ -1,29 +1,25 @@
 import {
-  Bot,
   CalendarClock,
-  Clock3,
+  CheckCircle2,
   Copy,
-  Github,
-  Mail,
   MoreHorizontal,
+  Pencil,
+  Play,
+  Power,
   RefreshCw,
   ShieldAlert,
-  Slack,
   Trash2,
+  Loader2,
+  Wrench,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { useContext } from "react"
+import { useContext, useEffect, useState } from "react"
 import { AgentConfigContext } from "@/context/AgentConfigContext"
-
-const connectedTools = [
-  { name: "Gmail", icon: Mail, tint: "text-red-500" },
-  { name: "Slack", icon: Slack, tint: "text-violet-600" },
-  { name: "Google Calendar", icon: CalendarClock, tint: "text-blue-500" },
-  { name: "Notion", icon: Bot, tint: "text-foreground" },
-  { name: "GitHub", icon: Github, tint: "text-foreground" },
-]
+import axios from "axios"
+import { toast } from "@/components/ui/toast"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -58,76 +54,162 @@ export function SettingsPanel() {
 }
 
 export function ToolsPanel() {
+  const { agentConfig } = useContext(AgentConfigContext)
+  const [tools, setTools] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!agentConfig?.agentId) return
+    const loadTools = async () => {
+      try {
+        const { data } = await axios.get(`/api/agent/tools?agentId=${encodeURIComponent(agentConfig.agentId)}`)
+        setTools(data.tools)
+      } catch {
+        toast.add({ type: "error", title: "Unable to load tools" })
+      } finally { setLoading(false) }
+    }
+    void loadTools()
+  }, [agentConfig?.agentId])
+
+  const setToolConnection = (slug: string, connected: boolean) => {
+    setTools((current) => current.map((tool) => tool.slug === slug ? { ...tool, connected, enabled: connected } : tool))
+  }
+
+  const disconnectTool = async (toolSlug: string) => {
+    if (!agentConfig?.agentId) return
+    setPendingSlug(toolSlug)
+    try {
+      await axios.post("/api/agent/disconnect", { agentId: agentConfig.agentId, toolSlug })
+      setToolConnection(toolSlug, false)
+    } catch {
+      toast.add({ type: "error", title: "Unable to disconnect tool" })
+    } finally { setPendingSlug(null) }
+  }
+
   return (
     <div>
       <div>
         <h3 className="text-sm font-semibold">Tools</h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Connect the apps your agent needs to do its work.
+          Connected apps available to this agent.
         </p>
       </div>
       <div className="mt-5 divide-y divide-border rounded-xl border border-border">
-        {connectedTools.map(({ name, icon: Icon, tint }) => (
-          <div key={name} className="flex items-center gap-3 px-3 py-3">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
-              <Icon className={`size-4 ${tint}`} />
-            </span>
-            <span className="flex-1 text-sm font-medium">{name}</span>
-            <Button size="sm" variant="outline">
-              Connect
-            </Button>
+        {loading ? <p className="p-4 text-sm text-muted-foreground">Loading tools…</p> : tools.filter((tool) => tool.connected).length === 0 ? <p className="p-4 text-sm text-muted-foreground">No tools are connected.</p> : tools.filter((tool) => tool.connected).map((tool) => {
+          const pending = pendingSlug === tool.slug
+          return <div key={tool.slug} className="flex items-center gap-3 px-3 py-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">{tool.icon ? <img src={tool.icon} alt="" className="size-5 object-contain" /> : <Wrench className="size-4" />}</span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tool.name}</span><span className="block truncate text-xs text-muted-foreground">{tool.description}</span></span>
+            <div className="flex items-center gap-2"><span className="hidden items-center gap-1 text-xs text-green-600 sm:flex"><CheckCircle2 className="size-3.5" />Connected</span><Button size="sm" variant="outline" onClick={() => disconnectTool(tool.slug)} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null}Disconnect</Button></div>
           </div>
-        ))}
+        })}
       </div>
     </div>
   )
 }
 
 export function SchedulePanel() {
+  const { agentConfig } = useContext(AgentConfigContext)
+  const [routines, setRoutines] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [routineToDeactivate, setRoutineToDeactivate] = useState<any | null>(null)
+  const [deactivating, setDeactivating] = useState(false)
+
+  useEffect(() => {
+    if (!agentConfig?.agentId) return
+    const load = async () => {
+      try {
+        const response = await axios.get(`/api/routines?agentId=${encodeURIComponent(agentConfig.agentId)}`)
+        setRoutines(response.data.routines)
+      } catch {
+        toast.add({ type: "error", title: "Unable to load routines" })
+      } finally { setLoading(false) }
+    }
+    void load()
+    const changed = (event: Event) => {
+      const routine = (event as CustomEvent).detail
+      setRoutines((current) => {
+        const index = current.findIndex((item) => item.id === routine.id)
+        return index === -1 ? [routine, ...current] : current.map((item) => item.id === routine.id ? routine : item)
+      })
+    }
+    window.addEventListener("routine:changed", changed)
+    return () => window.removeEventListener("routine:changed", changed)
+  }, [agentConfig?.agentId])
+
+  const deleteRoutine = async (id: string) => {
+    try {
+      await axios.delete(`/api/routines?id=${encodeURIComponent(id)}`)
+      setRoutines((current) => current.filter((routine) => routine.id !== id))
+      toast.add({ type: "success", title: "Routine deleted" })
+    } catch { toast.add({ type: "error", title: "Unable to delete routine" }) }
+  }
+
+  const deactivateRoutine = async () => {
+    if (!routineToDeactivate) return
+    setDeactivating(true)
+    try {
+      const { data } = await axios.patch("/api/routines", { id: routineToDeactivate.id, isActive: false })
+      setRoutines((current) => current.map((routine) => routine.id === data.routine.id ? data.routine : routine))
+      setRoutineToDeactivate(null)
+      toast.add({ type: "success", title: "Routine deactivated" })
+    } catch {
+      toast.add({ type: "error", title: "Unable to deactivate routine" })
+    } finally { setDeactivating(false) }
+  }
+
+  const activateRoutine = async (id: string) => {
+    try {
+      const { data } = await axios.patch("/api/routines", { id, isActive: true })
+      setRoutines((current) => current.map((routine) => routine.id === data.routine.id ? data.routine : routine))
+      toast.add({ type: "success", title: "Routine activated" })
+    } catch {
+      toast.add({ type: "error", title: "Unable to activate routine" })
+    }
+  }
+
+  const describeSchedule = (schedule: any) => {
+    if (!schedule) return "Schedule unavailable"
+    const frequency = schedule.frequency === "once" ? "Once" : `Every ${schedule.frequency}`
+    const days = schedule.weekDays?.length ? ` · ${schedule.weekDays.join(", ")}` : ""
+    return `${frequency}${days} at ${schedule.time} (${schedule.timezone})`
+  }
+
+  const formatNextRun = (nextRunAt: string | null, timezone?: string) => {
+    if (!nextRunAt) return "No upcoming run"
+    return `Next run: ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(nextRunAt))}`
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h3 className="text-sm font-semibold">Schedule</h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Choose when this agent should run.
+          Routines created with your agent appear here. Scheduling execution is not enabled yet.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          className="rounded-xl border-2 border-primary bg-primary/5 px-3 py-3 text-left"
-        >
-          <Clock3 className="mb-2 size-4" />
-          <span className="block text-sm font-medium">Manual</span>
-          <span className="text-xs text-muted-foreground">Run on demand</span>
-        </button>
-        <button
-          type="button"
-          className="rounded-xl border border-border px-3 py-3 text-left hover:bg-muted"
-        >
-          <CalendarClock className="mb-2 size-4 text-muted-foreground" />
-          <span className="block text-sm font-medium">Recurring</span>
-          <span className="text-xs text-muted-foreground">
-            Run on a schedule
-          </span>
-        </button>
-      </div>
-      <div className="rounded-xl border border-border p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Recurring schedule
-        </p>
-        <p className="mt-2 text-sm font-medium">Every day at 8:00 AM</p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <FieldLabel>Frequency</FieldLabel>
-            <Input defaultValue="Every day" />
+      {loading ? <p className="text-sm text-muted-foreground">Loading routines…</p> : routines.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No routines yet. Ask your agent to create one, then use the Create routine button in its routine card.</div>
+      ) : <div className="space-y-3">
+        {routines.map((routine) => <div key={routine.id} className="rounded-xl border border-border p-3">
+          <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{routine.name}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{describeSchedule(routine.schedule)}</p><p className="mt-1 text-xs text-muted-foreground">{routine.isActive === false ? "Inactive" : formatNextRun(routine.nextRunAt, routine.schedule?.timezone)}</p></div>
+            <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={`Manage ${routine.name}`} />}><MoreHorizontal className="size-4" /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent("routine:edit", { detail: routine }))}><Pencil />Edit</DropdownMenuItem>{routine.isActive === false ? <DropdownMenuItem onClick={() => activateRoutine(routine.id)}><Play />Activate</DropdownMenuItem> : <DropdownMenuItem onClick={() => setRoutineToDeactivate(routine)}><Power />Deactivate</DropdownMenuItem>}<DropdownMenuItem variant="destructive" onClick={() => deleteRoutine(routine.id)}><Trash2 />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
           </div>
-          <div>
-            <FieldLabel>Time</FieldLabel>
-            <Input defaultValue="8:00 AM" />
-          </div>
-        </div>
-      </div>
+        </div>)}
+      </div>}
+      <AlertDialog open={Boolean(routineToDeactivate)} onOpenChange={(open) => !open && setRoutineToDeactivate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate routine?</AlertDialogTitle>
+            <AlertDialogDescription>{routineToDeactivate ? `“${routineToDeactivate.name}” will be inactive and will not have a future scheduled run.` : ""}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={deactivateRoutine} disabled={deactivating}>{deactivating ? "Deactivating…" : "Deactivate"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

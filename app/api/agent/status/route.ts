@@ -26,8 +26,20 @@ export async function GET(req: NextRequest) {
   }
 
   const activeAccounts = await getActiveConnectedAccounts(session.user.email, [toolSlug]);
+  const connected = Boolean(activeAccounts[toolSlug.toLowerCase()]?.length);
+
+  if (connected) {
+    const configuredTools = Array.isArray(agentConfig.tools) ? agentConfig.tools : [];
+    if (!configuredTools.includes(toolSlug)) {
+      await db
+        .update(AgentConfig)
+        .set({ tools: [...configuredTools, toolSlug] })
+        .where(eq(AgentConfig.agentId, agentConfig.agentId));
+    }
+  }
+
   return NextResponse.json({
     toolSlug,
-    connected: Boolean(activeAccounts[toolSlug.toLowerCase()]?.length),
+    connected,
   });
 }
