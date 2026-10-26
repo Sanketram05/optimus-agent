@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
         timezone,
         connectedToolSlugs,
         routines,
+        { agentId, userEmail: session.user.email },
     );
 
     // The model can vary a toolkit slug's casing despite being given the catalog.

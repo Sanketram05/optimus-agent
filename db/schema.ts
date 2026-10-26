@@ -77,6 +77,18 @@ export const AgentChatHistory = pgTable("agent_chat_history", {
   messages: jsonb("messages").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// One durable E2B desktop per agent. The sandbox ID survives pauses so an
+// agent resumes the same machine (and filesystem) instead of getting a new VM.
+export const AgentVmSessions = pgTable("agent_vm_sessions", {
+  agentId: varchar("agent_id").primaryKey().references(() => AgentConfig.agentId),
+  userEmail: text("user_email").notNull().references(() => users.email),
+  sandboxId: varchar("sandbox_id").notNull().unique(),
+  status: varchar("status", { length: 20 }).notNull().default("paused"),
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
  
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
