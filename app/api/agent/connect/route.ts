@@ -32,6 +32,13 @@ export async function POST(req: NextRequest) {
 
   const activeAccounts = await getActiveConnectedAccounts(session.user.email, [toolSlug]);
   if (activeAccounts[toolSlug.toLowerCase()]?.length) {
+    const configuredTools = Array.isArray(agentConfig.tools) ? agentConfig.tools : [];
+    if (!configuredTools.includes(toolSlug)) {
+      await db
+        .update(AgentConfig)
+        .set({ tools: [...configuredTools, toolSlug] })
+        .where(eq(AgentConfig.agentId, agentConfig.agentId));
+    }
     return NextResponse.json({ connected: true });
   }
 
@@ -39,14 +46,6 @@ export async function POST(req: NextRequest) {
   const authConfig = authConfigs.items[0] ?? await composio.authConfigs.create(toolSlug, {
     type: "use_composio_managed_auth",
   });
-
-  const configuredTools = Array.isArray(agentConfig.tools) ? agentConfig.tools : [];
-  await db
-    .update(AgentConfig)
-    .set({
-      tools: configuredTools.includes(toolSlug) ? configuredTools : [...configuredTools, toolSlug],
-    })
-    .where(eq(AgentConfig.agentId, agentConfig.agentId));
 
   const callbackUrl = new URL(`/workspace/${agentId}`, req.url).toString();
   const connection = await composio.connectedAccounts.link(

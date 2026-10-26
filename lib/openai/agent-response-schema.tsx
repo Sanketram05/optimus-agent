@@ -3,12 +3,7 @@ import { z } from "zod";
 export const toolSuggestionSchema = z.object({
   slug: z.string(),
   reason: z.string(),
-  description: z.string(),
-  name: z.string(),
-  icon: z.string(),
-  isConnected: z.boolean(),
-  isEnabled: z.boolean()
-})
+});
 
 export const routineSchema = z.object({
   name: z.string(),
@@ -40,6 +35,7 @@ export const agentResponseSchema = z.object({
   ),
   routine: routineSchema.nullable(),
   suggestedTools: z.array(toolSuggestionSchema).default([]),
+  connectedTools: z.array(toolSuggestionSchema).default([]),
 });
 
 export type AgentResponse = z.infer<typeof agentResponseSchema>;

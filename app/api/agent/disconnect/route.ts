@@ -31,5 +31,11 @@ export async function POST(req: NextRequest) {
   });
   await Promise.all(accounts.items.map((account) => composio.connectedAccounts.disable(account.id)));
 
+  const configuredTools = Array.isArray(agentConfig.tools) ? agentConfig.tools : [];
+  await db
+    .update(AgentConfig)
+    .set({ tools: configuredTools.filter((slug) => slug !== toolSlug) })
+    .where(eq(AgentConfig.agentId, agentConfig.agentId));
+
   return NextResponse.json({ toolSlug, connected: false });
 }
