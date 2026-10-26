@@ -9,6 +9,7 @@ import { ToolSuggestionCard } from "./ToolSuggestionCard"
 import axios from "axios"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
+import { formatRoutineTime } from "@/lib/routines/format"
 
 export function RoutineCard({
   routine,
@@ -50,7 +51,7 @@ export function RoutineCard({
           <CalendarClock className="size-4 text-primary" />
           <CardTitle>{routine.name}</CardTitle>
         </div>
-        <CardDescription>{frequency}{weekDays} at {schedule.time} ({schedule.timezone})</CardDescription>
+        <CardDescription>{frequency}{weekDays} at {formatRoutineTime(schedule.time)} ({schedule.timezone})</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded-lg bg-muted/60 p-3">
@@ -64,7 +65,7 @@ export function RoutineCard({
           <p className="whitespace-pre-wrap text-sm leading-5">{routine.instructions}</p>
         </div>
         <ToolSuggestionCard title="Tools for this routine" suggestions={routine.tools} tools={toolCards} agentId={agentId} />
-        {nextRunAt && <p className="text-xs text-muted-foreground">Next run: {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: schedule.timezone }).format(new Date(nextRunAt))}</p>}
+        {nextRunAt && <p className="text-xs text-muted-foreground">Next run: {new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: schedule.timezone }).format(new Date(nextRunAt))}</p>}
         <Button className="w-full" onClick={saveRoutine} disabled={saving}>
           {saving && <Loader2 className="size-4 animate-spin" />}
           {routineId ? "Update routine" : "Create routine"}
