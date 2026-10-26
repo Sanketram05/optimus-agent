@@ -25,7 +25,7 @@ export const routineSchema = z.object({
 });
 
 export const agentResponseSchema = z.object({
-  type: z.enum(["message", "clarification", "routine", "tool_connection"]),
+  type: z.enum(["message", "clarification", "routine", "routine_run", "tool_connection"]),
   message: z.string(),
   questions: z.array(
     z.object({
@@ -34,6 +34,7 @@ export const agentResponseSchema = z.object({
     })
   ),
   routine: routineSchema.nullable(),
+  routineAction: z.object({ action: z.literal("run"), routineId: z.string().nullable() }).nullable(),
   suggestedTools: z.array(toolSuggestionSchema).default([]),
   connectedTools: z.array(toolSuggestionSchema).default([]),
 });

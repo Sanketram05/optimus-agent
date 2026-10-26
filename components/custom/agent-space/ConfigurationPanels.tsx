@@ -20,6 +20,7 @@ import axios from "axios"
 import { toast } from "@/components/ui/toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { formatRoutineTime } from "@/lib/routines/format"
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -115,6 +116,8 @@ export function SchedulePanel() {
   const [loading, setLoading] = useState(true)
   const [routineToDeactivate, setRoutineToDeactivate] = useState<any | null>(null)
   const [deactivating, setDeactivating] = useState(false)
+  const [routineToRun, setRoutineToRun] = useState<any | null>(null)
+  const [executions, setExecutions] = useState<Record<string, { id: string; status: string }>>({})
 
   useEffect(() => {
     if (!agentConfig?.agentId) return
@@ -122,6 +125,7 @@ export function SchedulePanel() {
       try {
         const response = await axios.get(`/api/routines?agentId=${encodeURIComponent(agentConfig.agentId)}`)
         setRoutines(response.data.routines)
+        setExecutions(Object.fromEntries(response.data.routines.filter((routine: any) => routine.execution).map((routine: any) => [routine.id, routine.execution])))
       } catch {
         toast.add({ type: "error", title: "Unable to load routines" })
       } finally { setLoading(false) }
@@ -137,6 +141,20 @@ export function SchedulePanel() {
     window.addEventListener("routine:changed", changed)
     return () => window.removeEventListener("routine:changed", changed)
   }, [agentConfig?.agentId])
+
+  useEffect(() => {
+    const active = Object.entries(executions).filter(([, execution]) => ["queued", "running"].includes(execution.status))
+    if (!active.length) return
+    const poll = window.setInterval(() => {
+      active.forEach(async ([routineId, execution]) => {
+        try {
+          const { data } = await axios.get(`/api/routines/execution?id=${encodeURIComponent(execution.id)}`)
+          setExecutions((current) => ({ ...current, [routineId]: { id: execution.id, status: data.execution.status } }))
+        } catch { /* refreshed later */ }
+      })
+    }, 2_500)
+    return () => window.clearInterval(poll)
+  }, [executions])
 
   const deleteRoutine = async (id: string) => {
     try {
@@ -169,16 +187,38 @@ export function SchedulePanel() {
     }
   }
 
+  const runRoutine = async () => {
+    if (!routineToRun) return
+    try {
+      const { data } = await axios.post("/api/routines/run", { routineId: routineToRun.id })
+      const execution = data.execution
+      setExecutions((current) => ({ ...current, [routineToRun.id]: { id: execution.id, status: execution.status } }))
+      setRoutineToRun(null)
+      const poll = window.setInterval(async () => {
+        try {
+          const { data: latest } = await axios.get(`/api/routines/execution?id=${encodeURIComponent(execution.id)}`)
+          setExecutions((current) => ({ ...current, [routineToRun.id]: { id: execution.id, status: latest.execution.status } }))
+          if (["completed", "failed"].includes(latest.execution.status)) {
+            window.clearInterval(poll)
+            toast.add({ type: latest.execution.status === "completed" ? "success" : "error", title: latest.execution.status === "completed" ? "Routine completed" : "Routine failed", description: latest.execution.error ?? undefined })
+          }
+        } catch { window.clearInterval(poll) }
+      }, 2_500)
+    } catch (error) {
+      toast.add({ type: "error", title: "Unable to run routine", description: axios.isAxiosError(error) ? error.response?.data?.error : undefined })
+    }
+  }
+
   const describeSchedule = (schedule: any) => {
     if (!schedule) return "Schedule unavailable"
     const frequency = schedule.frequency === "once" ? "Once" : `Every ${schedule.frequency}`
     const days = schedule.weekDays?.length ? ` · ${schedule.weekDays.join(", ")}` : ""
-    return `${frequency}${days} at ${schedule.time} (${schedule.timezone})`
+    return `${frequency}${days} at ${formatRoutineTime(schedule.time)} (${schedule.timezone})`
   }
 
   const formatNextRun = (nextRunAt: string | null, timezone?: string) => {
     if (!nextRunAt) return "No upcoming run"
-    return `Next run: ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(nextRunAt))}`
+    return `Next run: ${new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: timezone }).format(new Date(nextRunAt))}`
   }
 
   return (
@@ -193,7 +233,8 @@ export function SchedulePanel() {
         <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No routines yet. Ask your agent to create one, then use the Create routine button in its routine card.</div>
       ) : <div className="space-y-3">
         {routines.map((routine) => <div key={routine.id} className="rounded-xl border border-border p-3">
-          <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{routine.name}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{describeSchedule(routine.schedule)}</p><p className="mt-1 text-xs text-muted-foreground">{routine.isActive === false ? "Inactive" : formatNextRun(routine.nextRunAt, routine.schedule?.timezone)}</p></div>
+          <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{routine.name}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{describeSchedule(routine.schedule)}</p><p className="mt-1 text-xs text-muted-foreground">{executions[routine.id] ? executions[routine.id].status === "running" ? "Running…" : executions[routine.id].status === "queued" ? "Executing…" : executions[routine.id].status === "completed" ? "Completed" : "Failed" : routine.isActive === false ? "Inactive" : formatNextRun(routine.nextRunAt, routine.schedule?.timezone)}</p></div>
+            <Button size="icon" variant="ghost" aria-label={`Run ${routine.name}`} title="Run now" onClick={() => setRoutineToRun(routine)} disabled={routine.isActive === false || ["queued", "running"].includes(executions[routine.id]?.status ?? "")}><Play className="size-4" /></Button>
             <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={`Manage ${routine.name}`} />}><MoreHorizontal className="size-4" /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent("routine:edit", { detail: routine }))}><Pencil />Edit</DropdownMenuItem>{routine.isActive === false ? <DropdownMenuItem onClick={() => activateRoutine(routine.id)}><Play />Activate</DropdownMenuItem> : <DropdownMenuItem onClick={() => setRoutineToDeactivate(routine)}><Power />Deactivate</DropdownMenuItem>}<DropdownMenuItem variant="destructive" onClick={() => deleteRoutine(routine.id)}><Trash2 />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
           </div>
         </div>)}
@@ -208,6 +249,12 @@ export function SchedulePanel() {
             <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={deactivateRoutine} disabled={deactivating}>{deactivating ? "Deactivating…" : "Deactivate"}</AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={Boolean(routineToRun)} onOpenChange={(open) => !open && setRoutineToRun(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Run routine now?</AlertDialogTitle><AlertDialogDescription>{routineToRun ? `“${routineToRun.name}” will run immediately.` : ""}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={runRoutine}>Run now</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

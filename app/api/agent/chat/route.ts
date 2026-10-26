@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { getServerSession } from "next-auth";
-import { AgentConfig, db, Tools } from "@/db";
+import { AgentConfig, db, Routines, Tools } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { executeAgentChat } from "@/lib/openai/openai-agent";
 import { getActiveConnectedAccounts, getOrCreateAgentSession } from "@/lib/composio/service";
 import { AgentConfigType } from "@/type/Agent";
+import { queueRoutineNow } from "@/lib/routines/queue";
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
     }
     
     const tools = await db.select().from(Tools).where(eq(Tools.isActive,true));
+    const routines = await db.select({ id: Routines.id, name: Routines.name, goal: Routines.goal }).from(Routines)
+      .where(and(eq(Routines.agentId, agentId), eq(Routines.userEmail, session.user.email), eq(Routines.isActive, true)));
      
     const toolsCatalog=tools.map((tool) => ({
         slug: tool.slug,
@@ -66,7 +69,8 @@ export async function POST(req: NextRequest) {
         agentComposioTools,
         toolsCatalog,
         timezone,
-        connectedToolSlugs
+        connectedToolSlugs,
+        routines,
     );
 
     // The model can vary a toolkit slug's casing despite being given the catalog.
@@ -81,6 +85,19 @@ export async function POST(req: NextRequest) {
         response.connectedTools = normalizeSuggestions(response.connectedTools);
         if (response.routine) {
             response.routine.tools = normalizeSuggestions(response.routine.tools);
+        }
+    }
+
+    if (response?.type === "routine_run" && response.routineAction?.routineId) {
+        try {
+            const queued = await queueRoutineNow(response.routineAction.routineId, session.user.email);
+            response.message = queued.alreadyQueued
+              ? `${response.message}\n\nThat routine is already queued or running.`
+              : `${response.message}\n\nThe routine has been queued to run now.`;
+        } catch (error) {
+            response.type = "message";
+            response.routineAction = null;
+            response.message = error instanceof Error ? error.message : "Unable to queue the routine.";
         }
     }
 

@@ -2,6 +2,7 @@ import { MessageType } from "@/type/Message"
 import { RoutineCard } from "./RoutineCard"
 import { ToolSuggestionCard } from "./ToolSuggestionCard"
 import { CalendarClock, Pencil } from "lucide-react"
+import { formatRoutineTime } from "@/lib/routines/format"
 
 export function AgentResponseView({ message, agentId }: { message: MessageType; agentId: string }) {
   if (message.editingRoutine) {
@@ -16,7 +17,7 @@ export function AgentResponseView({ message, agentId }: { message: MessageType; 
             <p className="text-sm font-medium">Editing routine</p>
             <p className="break-words text-sm font-semibold leading-5">{name}</p>
             <p className="break-words text-xs leading-5 text-muted-foreground">{goal}</p>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock className="size-3.5 shrink-0" />{frequency}{days} at {schedule.time}</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock className="size-3.5 shrink-0" />{frequency}{days} at {formatRoutineTime(schedule.time)}</p>
           </div>
         </div>
         <p className="text-sm">What would you like to change?</p>

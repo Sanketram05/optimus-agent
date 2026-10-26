@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { authOptions } from "../auth/[...nextauth]/route";
-import { AgentConfig, db, Routines } from "@/db";
+import { AgentConfig, db, RoutineExecutions, Routines } from "@/db";
 import { calculateNextRunAt, RoutineSchedule } from "@/lib/routines/next-run";
 
 type RoutineInput = { name?: string; goal?: string; instructions?: string; schedule?: unknown; tools?: unknown };
@@ -23,7 +23,10 @@ export async function GET(req: NextRequest) {
   if (!agentId) return NextResponse.json({ error: "agentId is required" }, { status: 400 });
   if (!await getOwner(agentId, session.user.email)) return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   const routines = await db.select().from(Routines).where(and(eq(Routines.agentId, agentId), eq(Routines.userEmail, session.user.email))).orderBy(desc(Routines.createdAt));
-  return NextResponse.json({ routines });
+  const activeExecutions = await db.select().from(RoutineExecutions)
+    .where(inArray(RoutineExecutions.status, ["queued", "running"]));
+  const byRoutine = new Map(activeExecutions.map((execution) => [execution.routineId, { id: execution.id, status: execution.status }]));
+  return NextResponse.json({ routines: routines.map((routine) => ({ ...routine, execution: byRoutine.get(routine.id) ?? null })) });
 }
 
 export async function POST(req: NextRequest) {

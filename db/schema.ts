@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -56,6 +56,20 @@ export const Routines = pgTable("routines", {
     .defaultNow()
     .notNull(),
 });
+
+export const RoutineExecutions = pgTable("routine_executions", {
+  id: varchar("id").primaryKey(),
+  routineId: varchar("routine_id").notNull().references(() => Routines.id),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("queued"),
+  result: jsonb("result"),
+  error: text("error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("routine_executions_routine_scheduled_unique").on(table.routineId, table.scheduledFor),
+]);
  
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
