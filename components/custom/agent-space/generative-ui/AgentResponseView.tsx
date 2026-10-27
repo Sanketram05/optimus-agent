@@ -28,17 +28,17 @@ export function AgentResponseView({ message, agentId }: { message: MessageType; 
   if (!response) return <p className="whitespace-pre-wrap break-words">{message.content}</p>
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
       <p className="whitespace-pre-wrap break-words">{response.message}</p>
       {response.vmTask && (
-        <div className={`rounded-xl border p-3 ${response.vmTask.status === "needs_user_login" ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-muted/30"}`}>
+        <div className={`min-w-0 max-w-full rounded-xl border p-3 ${response.vmTask.status === "needs_user_login" ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-muted/30"}`}>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             VM desktop · {response.vmTask.status.replaceAll("_", " ")}
           </p>
           <p className="mt-1 text-sm">{response.vmTask.summary}</p>
           {response.vmTask.details.length > 0 && (
-            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm">
-              {response.vmTask.details.map((detail, index) => <li key={`${index}-${detail}`}>{detail}</li>)}
+            <ul className="mt-2 min-w-0 list-disc space-y-1 pl-4 text-sm">
+              {response.vmTask.details.map((detail, index) => <li className="break-words" key={`${index}-${detail}`}>{detail}</li>)}
             </ul>
           )}
           {response.vmTask.userAction && <p className="mt-2 text-sm font-medium">{response.vmTask.userAction}</p>}

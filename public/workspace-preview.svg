@@ -1,0 +1,43 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="900" rx="24" fill="#FAFAFA"/>
+  <rect width="276" height="900" fill="white"/>
+  <path d="M276 0V900" stroke="#E4E4E7"/>
+  <rect x="32" y="34" width="42" height="42" rx="13" fill="#18181B"/>
+  <path d="M45 55h16M53 47v16" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <text x="88" y="61" fill="#18181B" font-family="Arial, sans-serif" font-size="24" font-weight="700">Optimus</text>
+  <rect x="24" y="112" width="228" height="46" rx="11" fill="#18181B"/>
+  <path d="M44 135h15M51.5 127.5v15" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="75" y="141" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="600">Create New Agent</text>
+  <text x="32" y="212" fill="#71717A" font-family="Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">YOUR AGENTS</text>
+  <rect x="24" y="230" width="228" height="54" rx="10" fill="#F4F4F5"/>
+  <circle cx="51" cy="257" r="17" fill="#A5B4FC"/>
+  <circle cx="51" cy="253" r="6" fill="#312E81"/><path d="M40 270c3-8 19-8 22 0" fill="#312E81"/>
+  <text x="78" y="261" fill="#27272A" font-family="Arial, sans-serif" font-size="14" font-weight="600">Research Scout</text>
+  <circle cx="51" cy="321" r="17" fill="#A7F3D0"/>
+  <text x="78" y="325" fill="#71717A" font-family="Arial, sans-serif" font-size="14">Content Partner</text>
+  <path d="M0 760H276" stroke="#E4E4E7"/>
+  <circle cx="51" cy="806" r="18" fill="#E4E4E7"/>
+  <text x="78" y="802" fill="#27272A" font-family="Arial, sans-serif" font-size="14" font-weight="600">Your workspace</text>
+  <text x="78" y="823" fill="#71717A" font-family="Arial, sans-serif" font-size="12">ready to create</text>
+  <rect x="276" width="1164" height="76" fill="white"/>
+  <path d="M276 76H1440" stroke="#E4E4E7"/>
+  <circle cx="325" cy="38" r="21" fill="#A5B4FC"/>
+  <text x="360" y="34" fill="#18181B" font-family="Arial, sans-serif" font-size="15" font-weight="700">Research Scout</text>
+  <circle cx="360" cy="55" r="4" fill="#22C55E"/>
+  <text x="370" y="59" fill="#71717A" font-family="Arial, sans-serif" font-size="12">Active</text>
+  <rect x="533" y="126" width="650" height="70" rx="18" fill="#18181B"/>
+  <text x="563" y="168" fill="white" font-family="Arial, sans-serif" font-size="16">Find the top customer themes from this week.</text>
+  <text x="1114" y="184" fill="#A1A1AA" font-family="Arial, sans-serif" font-size="11">You</text>
+  <circle cx="440" cy="266" r="22" fill="#A5B4FC"/>
+  <rect x="476" y="224" width="640" height="265" rx="18" fill="white" stroke="#E4E4E7"/>
+  <text x="504" y="261" fill="#18181B" font-family="Arial, sans-serif" font-size="16">I found three clear themes in the feedback:</text>
+  <text x="504" y="307" fill="#27272A" font-family="Arial, sans-serif" font-size="15" font-weight="700">1. Faster onboarding</text>
+  <text x="527" y="335" fill="#52525B" font-family="Arial, sans-serif" font-size="14">People want a clearer path to their first result.</text>
+  <text x="504" y="380" fill="#27272A" font-family="Arial, sans-serif" font-size="15" font-weight="700">2. More visibility</text>
+  <text x="527" y="408" fill="#52525B" font-family="Arial, sans-serif" font-size="14">Teams need progress and status in one place.</text>
+  <text x="504" y="453" fill="#27272A" font-family="Arial, sans-serif" font-size="15" font-weight="700">3. Better handoffs</text>
+  <rect x="446" y="716" width="805" height="64" rx="16" fill="white" stroke="#D4D4D8"/>
+  <text x="472" y="755" fill="#A1A1AA" font-family="Arial, sans-serif" font-size="14">Ask your agent anything...</text>
+  <rect x="1185" y="728" width="52" height="40" rx="11" fill="#18181B"/>
+  <path d="M1203 748h17m-7-7 7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

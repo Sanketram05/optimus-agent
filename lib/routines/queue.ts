@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { db, RoutineExecutions, Routines } from "@/db";
+import { AgentConfig, db, RoutineExecutions, Routines } from "@/db";
 import { inngest } from "@/lib/inngest/client";
 
 export async function queueRoutineNow(routineId: string, userEmail: string) {
@@ -7,6 +7,9 @@ export async function queueRoutineNow(routineId: string, userEmail: string) {
     .where(and(eq(Routines.id, routineId), eq(Routines.userEmail, userEmail)));
   if (!routine) throw new Error("Routine not found");
   if (!routine.isActive) throw new Error("This routine is inactive");
+  const [agent] = await db.select({ isActive: AgentConfig.isActive }).from(AgentConfig)
+    .where(and(eq(AgentConfig.agentId, routine.agentId), eq(AgentConfig.userEmail, userEmail)));
+  if (!agent?.isActive) throw new Error("This agent is paused");
   const [active] = await db.select().from(RoutineExecutions)
     .where(and(eq(RoutineExecutions.routineId, routineId), inArray(RoutineExecutions.status, ["queued", "running"])));
   if (active) return { execution: active, alreadyQueued: true };

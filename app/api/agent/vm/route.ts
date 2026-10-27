@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
 async function getOwnedSession(agentId: string, userEmail: string) {
-  const [agent] = await db.select({ agentId: AgentConfig.agentId })
+  const [agent] = await db.select({ agentId: AgentConfig.agentId, isActive: AgentConfig.isActive })
     .from(AgentConfig)
     .where(and(eq(AgentConfig.agentId, agentId), eq(AgentConfig.userEmail, userEmail)));
   if (!agent) return null;
@@ -51,9 +51,12 @@ export async function POST(req: NextRequest) {
   try {
     const existing = await getOwnedSession(agentId, session.user.email);
     // getOwnedSession returns null for both a missing agent and a missing VM. Verify the agent before creating.
-    const [agent] = await db.select({ agentId: AgentConfig.agentId }).from(AgentConfig)
+    const [agent] = await db.select({ agentId: AgentConfig.agentId, isActive: AgentConfig.isActive }).from(AgentConfig)
       .where(and(eq(AgentConfig.agentId, agentId), eq(AgentConfig.userEmail, session.user.email)));
     if (!agent) return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    if (!agent.isActive && action === "activate") {
+      return NextResponse.json({ error: "This agent is paused. Resume it from Agent settings first." }, { status: 409 });
+    }
     if (!existing && action !== "activate") return NextResponse.json({ status: "not-created" });
 
     if (action === "pause" && existing) {

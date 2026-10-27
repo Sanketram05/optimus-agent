@@ -15,6 +15,7 @@ export const AgentConfig = pgTable('agentConfig', {
   description: text('description'),
   agentImage: text('agentImage'),
   tools: jsonb('tools'),
+  isActive: boolean('is_active').default(true).notNull(),
   composioSessionId: varchar('composioSessionId'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   userEmail: text('userEmail').notNull().references(() => users.email),

@@ -130,7 +130,7 @@ export function ToolSuggestionCard({
           const toolIcon = tool?.icon
 
           return (
-            <div key={suggestion.slug} className="flex gap-3 rounded-lg border border-border bg-card p-3">
+            <div key={suggestion.slug} className="flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                 {toolIcon ? (
                   <img
@@ -170,7 +170,7 @@ export function ToolSuggestionCard({
                     </Button>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                <p className="mt-0.5 break-words text-xs leading-5 text-muted-foreground">
                   {suggestion.reason || tool?.description}
                 </p>
               </div>
