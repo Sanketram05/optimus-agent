@@ -43,10 +43,11 @@ export const routineScheduler = inngest.createFunction(
     });
     const windowEnd = new Date(Date.now() + 60 * 60 * 1000);
     const claims = await step.run("claim-routines-in-next-hour", async () => {
-      const candidates = await db.select().from(Routines)
-        .where(and(eq(Routines.isActive, true), lte(Routines.nextRunAt, windowEnd)));
+      const candidates = await db.select({ routine: Routines }).from(Routines)
+        .innerJoin(AgentConfig, eq(Routines.agentId, AgentConfig.agentId))
+        .where(and(eq(Routines.isActive, true), eq(AgentConfig.isActive, true), lte(Routines.nextRunAt, windowEnd)));
       const claimed: RoutineExecutionData[] = [];
-      for (const routine of candidates) {
+      for (const { routine } of candidates) {
         if (!routine.nextRunAt) continue;
         const scheduledFor = routine.nextRunAt;
         const executionId = crypto.randomUUID();
@@ -121,6 +122,14 @@ export const executeRoutine = inngest.createFunction(
       const [routine] = await db.select().from(Routines).where(eq(Routines.id, routineId));
       const [agent] = routine ? await db.select().from(AgentConfig).where(eq(AgentConfig.agentId, routine.agentId)) : [];
       if (!routine || !agent || !routine.isActive) throw new Error("Routine or agent is no longer available");
+      if (!agent.isActive) {
+        await db.update(RoutineExecutions).set({
+          status: "failed",
+          error: "Agent is paused",
+          completedAt: new Date(),
+        }).where(eq(RoutineExecutions.id, executionId));
+        return { skipped: true };
+      }
 
       await db.update(RoutineExecutions).set({ status: "running", startedAt: new Date(), error: null })
         .where(eq(RoutineExecutions.id, executionId));
@@ -155,6 +164,8 @@ export const executeRoutine = inngest.createFunction(
         throw error;
       }
     });
+    if ("skipped" in result) return result;
+
     await step.run("mark-execution-completed", async () => {
       const status = result.vmTask?.status === "needs_user_login" ? "needs_user_login"
         : result.vmTask?.status === "failed" ? "failed" : "completed";

@@ -8,6 +8,13 @@
       "when": 1793040408593,
       "tag": "0000_agent_vm_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793094473337,
+      "tag": "0001_agent_active_status",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,10 @@
 import {
   CalendarClock,
   CheckCircle2,
-  Copy,
   MoreHorizontal,
   Pencil,
   Play,
   Power,
-  RefreshCw,
   ShieldAlert,
   Trash2,
   Loader2,
@@ -21,6 +19,8 @@ import { toast } from "@/components/ui/toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { formatRoutineTime } from "@/lib/routines/format"
+import { Switch } from "@/components/ui/switch"
+import { useRouter } from "next/navigation"
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -288,48 +288,68 @@ export function ExecutionHistoryPanel() {
 }
 
 export function AgentSettingsPanel() {
-  const options = [
-    {
-      label: "Duplicate agent",
-      copy: "Create a copy with the same configuration.",
-      icon: Copy,
-    },
-    {
-      label: "Pause agent",
-      copy: "Temporarily stop this agent from running.",
-      icon: MoreHorizontal,
-    },
-    {
-      label: "Reset agent",
-      copy: "Restore the default configuration.",
-      icon: RefreshCw,
-    },
-  ]
+  const { agentConfig, setAgentConfig } = useContext(AgentConfigContext)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const router = useRouter()
+  const isActive = agentConfig?.isActive !== false
+
+  const changeAgentStatus = async (active: boolean) => {
+    if (!agentConfig?.agentId) return
+    setSavingStatus(true)
+    try {
+      const { data } = await axios.put("/api/agent", { agentId: agentConfig.agentId, isActive: active })
+      setAgentConfig(data.agentConfig)
+      toast.add({
+        type: "success",
+        title: active ? "Agent resumed" : "Agent paused",
+        description: active ? "This agent can run again." : "This agent will no longer respond or run routines.",
+      })
+    } catch (error) {
+      console.error("Unable to update agent status:", error)
+      toast.add({ type: "error", title: "Unable to update agent status" })
+    } finally {
+      setSavingStatus(false)
+    }
+  }
+
+  const deleteAgent = async () => {
+    if (!agentConfig?.agentId) return
+    setDeleting(true)
+    try {
+      await axios.delete("/api/agent", { params: { agentId: agentConfig.agentId } })
+      toast.add({ type: "success", title: "Agent deleted" })
+      router.replace("/workspace")
+    } catch (error) {
+      console.error("Unable to delete agent:", error)
+      toast.add({ type: "error", title: "Unable to delete agent" })
+      setDeleting(false)
+    }
+  }
 
   return (
     <div>
       <div>
         <h3 className="text-sm font-semibold">Agent settings</h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Manage this agent&apos;s general options.
+          Pause the agent or permanently remove it and its saved routines and chat history.
         </p>
       </div>
-      <div className="mt-5 space-y-1">
-        {options.map(({ label, copy, icon: Icon }) => (
-          <button
-            type="button"
-            key={label}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-muted"
-          >
-            <Icon className="size-4 text-muted-foreground" />
-            <span className="flex-1">
-              <span className="block text-sm font-medium">{label}</span>
-              <span className="block pt-0.5 text-xs text-muted-foreground">
-                {copy}
-              </span>
-            </span>
-          </button>
-        ))}
+      <div className="mt-5 flex items-center gap-4 rounded-xl border border-border p-4">
+        <Power className={`size-4 ${isActive ? "text-emerald-600" : "text-muted-foreground"}`} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{isActive ? "Agent active" : "Agent paused"}</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+            {isActive ? "The agent can respond and run scheduled routines." : "The agent will not respond or run scheduled routines."}
+          </p>
+        </div>
+        <Switch
+          checked={isActive}
+          disabled={savingStatus || !agentConfig?.agentId}
+          onCheckedChange={(checked) => void changeAgentStatus(checked)}
+          aria-label={isActive ? "Pause agent" : "Resume agent"}
+        />
       </div>
       <div className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
         <div className="flex gap-2">
@@ -339,13 +359,30 @@ export function AgentSettingsPanel() {
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               Deleting this agent is permanent and cannot be undone.
             </p>
-            <Button variant="destructive" size="sm" className="mt-3">
+            <Button variant="destructive" size="sm" className="mt-3" onClick={() => setDeleteOpen(true)} disabled={!agentConfig?.agentId}>
               <Trash2 className="size-3.5" />
               Delete agent
             </Button>
           </div>
         </div>
       </div>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {agentConfig?.name || "this agent"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the agent, its routines, execution history, and chat history. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={deleting} onClick={() => void deleteAgent()}>
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Delete agent
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

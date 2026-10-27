@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
     if (!agentConfig) {
         return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
+    if (!agentConfig.isActive) {
+        return NextResponse.json({ error: "This agent is paused. Resume it from Agent settings to continue." }, { status: 409 });
+    }
 
     const configuredToolSlugs = Array.isArray(agentConfig.tools)
         ? agentConfig.tools.filter((tool): tool is string => typeof tool === "string")
