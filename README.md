@@ -124,24 +124,11 @@
 - Queue executions through Inngest.
 - Persist execution state and append results back into the agent chat.
 
-## Getting started
-
-### Prerequisites
-
-- Node.js 20+
-- PostgreSQL database
-- Google OAuth app
-- GitHub OAuth app
-- Mixroute API key
-- Composio API key
-- E2B API key for browser-research features
-- Inngest account and keys for scheduled routines
-
 ### Install
 
 ~~~bash
-git clone https://github.com/<your-username>/grok-bot-agent-clone.git
-cd grok-bot-agent-clone
+git clone https://github.com/Sanketram05/optimus-agent.git
+cd optimus-agent
 npm install
 ~~~
 
@@ -173,8 +160,6 @@ E2B_API_KEY=
 INNGEST_EVENT_KEY=
 INNGEST_SIGNING_KEY=
 ~~~
-
-> For deployment, replace both localhost URLs with your public HTTPS domain and register the matching Google and GitHub OAuth callback URLs.
 
 ### Database setup
 
@@ -217,11 +202,4 @@ npm run inngest:dev
 4. Ask the agent to research public information and send a result through the connected tool.
 5. Create a recurring routine and inspect its execution status in the agent workspace.
 
-## Deployment notes
-
-This is a portfolio project. Before making a public deployment, configure production OAuth callbacks and HTTPS URLs, set real Inngest keys if routines are enabled, and restrict or remove development-only event-trigger endpoints. For a public demo, set spending limits and rate limits around AI, E2B, and integration requests.
-
-## Project status
-
-Active portfolio project — built to demonstrate full-stack AI-agent architecture, OAuth, persistent state, external integrations, browser research, and background job orchestration.
 
